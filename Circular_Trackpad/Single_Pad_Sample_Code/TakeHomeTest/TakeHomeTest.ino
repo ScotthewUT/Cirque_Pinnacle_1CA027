@@ -90,48 +90,48 @@ absData_t touchData;
 // Each element represents the Z-value below which is considered "hovering" in that XY region of the sensor.
 // The values present are not guaranteed to work for all HW configurations.
 const uint8_t ZVALUE_MAP[ROWS_Y][COLS_X] =
-    {
-        {0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 2, 3, 5, 5, 3, 2, 0},
-        {0, 3, 5, 15, 15, 5, 2, 0},
-        {0, 3, 5, 15, 15, 5, 3, 0},
-        {0, 2, 3, 5, 5, 3, 2, 0},
-        {0, 0, 0, 0, 0, 0, 0, 0},
+{
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 2, 3, 5, 5, 3, 2, 0},
+    {0, 3, 5, 15, 15, 5, 2, 0},
+    {0, 3, 5, 15, 15, 5, 3, 0},
+    {0, 2, 3, 5, 5, 3, 2, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0},
 };
 
 // setup() gets called once at power-up, sets up serial debug output and Cirque's Pinnacle ASIC.
 void setup()
 {
-  Serial.begin(115200);
-  while(!Serial); // Wait for USB serial port to enumerate
+    Serial.begin(115200);
+    while (!Serial); // Wait for USB serial port to enumerate
 
-/*******************************************************************************
- * YOUR STARTUP CODE HERE
- ******************************************************************************/
+    /*******************************************************************************
+        YOUR STARTUP CODE HERE
+     ******************************************************************************/
 
-  pinMode(LED_0, OUTPUT);
-  
-  Pinnacle_Init();
+    pinMode(LED_0, OUTPUT);
 
-  // These functions are required for use with thick overlays (curved)
-  setAdcAttenuation(ADC_ATTENUATE_2X);
-  tuneEdgeSensitivity();
+    Pinnacle_Init();
 
-  // if the touchpad reports touches with no fingers near the pad then it may need
-  // to be calibrated. Generally it doesn't.
-  // Pinnacle_forceCalibration();
+    // These functions are required for use with thick overlays (curved)
+    //setAdcAttenuation(ADC_ATTENUATE_2X);
+    //tuneEdgeSensitivity();
 
-  Pinnacle_EnableFeed(true);
+    // if the touchpad reports touches with no fingers near the pad then it may need
+    // to be calibrated. Generally it doesn't.
+    // Pinnacle_forceCalibration();
 
-  Serial.println("** INITIALIZATION COMPLETE **");
+    Pinnacle_EnableFeed(true);
+
+    Serial.println("** INITIALIZATION COMPLETE **");
 }
 
 // loop() continuously checks to see if data-ready (DR) is high. If so, reads and reports touch data to terminal.
 void loop()
 {
-/*******************************************************************************
- * YOUR RUNNING CODE HERE
- ******************************************************************************/
+    /*******************************************************************************
+        YOUR RUNNING CODE HERE
+     ******************************************************************************/
 
 }
 
@@ -224,20 +224,20 @@ void setAdcAttenuation(uint8_t adcGain)
     Serial.print(temp &= 0xC0, HEX);
     switch (temp)
     {
-    case ADC_ATTENUATE_1X:
-        Serial.println(" (X/1)");
-        break;
-    case ADC_ATTENUATE_2X:
-        Serial.println(" (X/2)");
-        break;
-    case ADC_ATTENUATE_3X:
-        Serial.println(" (X/3)");
-        break;
-    case ADC_ATTENUATE_4X:
-        Serial.println(" (X/4)");
-        break;
-    default:
-        break;
+        case ADC_ATTENUATE_1X:
+            Serial.println(" (X/1)");
+            break;
+        case ADC_ATTENUATE_2X:
+            Serial.println(" (X/2)");
+            break;
+        case ADC_ATTENUATE_3X:
+            Serial.println(" (X/3)");
+            break;
+        case ADC_ATTENUATE_4X:
+            Serial.println(" (X/4)");
+            break;
+        default:
+            break;
     }
 }
 
@@ -289,20 +289,20 @@ void Pinnacle_CheckValidTouch(absData_t *touchData)
 // Calling this function will fix the problem. Warning, re-enable the feed after calling this.
 void Pinnacle_forceCalibration(void)
 {
-  uint8_t CalConfig1Value = 0x00;
+    uint8_t CalConfig1Value = 0x00;
 
-  Pinnacle_EnableFeed(false);
-  RAP_ReadBytes(0x07, &CalConfig1Value, 1);
-  CalConfig1Value |= 0x01;
-  RAP_Write(0x07, CalConfig1Value);
-
-  do
-  {
+    Pinnacle_EnableFeed(false);
     RAP_ReadBytes(0x07, &CalConfig1Value, 1);
-  }
-  while(CalConfig1Value & 0x01);
+    CalConfig1Value |= 0x01;
+    RAP_Write(0x07, CalConfig1Value);
 
-  Pinnacle_ClearFlags();
+    do
+    {
+        RAP_ReadBytes(0x07, &CalConfig1Value, 1);
+    }
+    while (CalConfig1Value & 0x01);
+
+    Pinnacle_ClearFlags();
 }
 
 /*  ERA (Extended Register Access) Functions  */
