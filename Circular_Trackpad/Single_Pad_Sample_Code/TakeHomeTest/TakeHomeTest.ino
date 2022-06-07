@@ -71,8 +71,8 @@
 
 #define TAP_TIMEOUT_MSEC 300
 
-#define DEBUG_SERIAL 1      // Print debug info to serial port
-#define TAP_THRESH 300      // Threshold for tap duration in ms
+#define DEBUG_SERIAL 0  // Print debug info to serial port
+#define TAP_THRESH 300  // Threshold for tap duration in ms
 
 // Convenient way to store and access measurements
 typedef struct _absData
@@ -85,6 +85,7 @@ typedef struct _absData
     bool hovering;
 } absData_t;
 
+// Global Declarations
 absData_t touchData;
 uint8_t initial_quadrant;
 unsigned long touch_down, lift_off;
@@ -141,51 +142,58 @@ void loop()
     /*******************************************************************************
         YOUR RUNNING CODE HERE
      ******************************************************************************/
-    if (DR_Asserted()) {
-        // Update timer
-        unsigned long timer = millis();
-        // Read Pinnacle data into absData_t struct
-        Pinnacle_GetAbsolute(touchData);
-
-        // As long as Z-idle count is configured to >0, the first empty packet can be used as lift-off detection
-        if (touchData.zValue == 0) {
+    if (DR_Asserted())
+    {
+        unsigned long timer = millis();   // Update timer        
+        Pinnacle_GetAbsolute(touchData);  // Read Pinnacle data into absData_t struct
+        
+        if (touchData.zValue == 0)
+        {   // As long as Z-idle count is configured to >0, the first empty packet can be used as lift-off detection
             lift_off = timer;
-            unsigned long touch_duration = (lift_off - touch_down) - 10;
-            if (touch_duration <= TAP_THRESH && maintained_quadrant) {
+            unsigned long touch_duration = (lift_off - touch_down);
+            if (touch_duration <= TAP_THRESH && maintained_quadrant)
+            {   // If the contact was under 300ms and never left its initial quadrant,
+                //   acknowledge the tap by printing the quadrant to serial port
                 Serial.print('Q');
                 Serial.println(initial_quadrant);
             }
             touch_recorded = false;
-            if (DEBUG_SERIAL) {
+            if (DEBUG_SERIAL)
+            {
                 Serial.print("Duration: ");
                 Serial.print(touch_duration);
                 Serial.println(" ms");
                 Serial.println("**  LIFT-OFF  **");
             }
-        } else {
+        }
+        else
+        {
             // Offset x & y positions with centerpoint
             int16_t x_pos = touchData.xValue - PINNACLE_X_CENTER;
             int16_t y_pos = touchData.yValue - PINNACLE_Y_CENTER;
             // Determine the current quadrant
             uint8_t quad = getQuadrant(x_pos, y_pos);
 
-            if (!touch_recorded) {
-                // Save initial data when touch is first detected
+            if (!touch_recorded)
+            {   // Save initial data when touch is first detected
                 initial_quadrant = quad;
                 maintained_quadrant = true;
                 touch_down = timer;
                 touch_recorded = true;
-                if (DEBUG_SERIAL) {
+                if (DEBUG_SERIAL)
+                {
                     Serial.println("** TOUCH DOWN **");
                 }
             }
 
-            if (quad != initial_quadrant) {
+            if (quad != initial_quadrant)
+            {
                 // Update flag if touch leaves initial quadrant
                 maintained_quadrant = false;
             }
 
-            if (DEBUG_SERIAL) {
+            if (DEBUG_SERIAL)
+            {
                 // Print touchData to console if debug macro is enabled
                 Serial.print(x_pos);
                 Serial.print('\t');
@@ -197,28 +205,31 @@ void loop()
             }
         }
     }
-    // Wait 10ms before checking DR buffer again. Per 1CA027 datasheet, the buffer is updated every 10 ms.
-    delay(10);
 }
 
-/** Determines the quadrant of a given x,y coordinate. Uses conventional Cartesian numbering.
-
-    @param  x The x-value of the coordinate
-    @param  y the y-value of the coordinate
-    @return The quadrant number of the coordinate (0-3)
-*/
-uint8_t getQuadrant(int16_t x, int16_t y) {
-    if (x >= 0 && y >= 0) {      //             ^ y
-        return 0;                //             |
-    }                            //      Q1     |     Q0
-    else if (x < 0 && y >= 0) {  //             |
-        return 1;                //             |
-    }                            // ------------------------>
-    else if (x < 0) {            //             |           x
-        return 2;                //             |
-    }                            //      Q2     |     Q3
-    else {                       //             |
-        return 3;                //             |
+/** Determines the quadrant of a given x,y coordinate based off conventional Cartesian numbering.
+ *
+ *  @param  x The x-value of the coordinate
+ *  @param  y the y-value of the coordinate
+ *  @return The quadrant number of the coordinate (0-3)
+ */
+uint8_t getQuadrant(int16_t x, int16_t y)
+{
+    if (x >= 0 && y >= 0)
+    {                             //              ^ y
+        return 0;                 //              |
+    }                             //              |
+    else if (x < 0 && y >= 0)     //       Q1     |     Q0
+    {                             //              |
+        return 1;                 //              |
+    }                             // -------------------------->
+    else if (x < 0)               //              |            x
+    {                             //              |
+        return 2;                 //       Q2     |     Q3
+    }                             //              |
+    else                          //              |
+    {                             //              |
+        return 3;
     }
 }
 
