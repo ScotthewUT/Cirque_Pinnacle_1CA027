@@ -70,6 +70,7 @@
 #define TAP_TIMEOUT_MSEC 300
 
 #define DEBUG_SERIAL 1  // Print debug info to serial port
+#define TAP_THRESH 300  // Threshold for tap duration in ms
 
 // Convenient way to store and access measurements
 typedef struct _absData
@@ -83,6 +84,8 @@ typedef struct _absData
 } absData_t;
 
 absData_t touchData;
+unsigned long touch_down, lift_off;
+bool touch_recorded;
 
 //const uint16_t ZONESCALE = 256;
 //const uint16_t ROWS_Y = 6;
@@ -110,6 +113,7 @@ void setup()
     /*******************************************************************************
         YOUR STARTUP CODE HERE
      ******************************************************************************/
+    touch_recorded = false;
 
     pinMode(LED_0, OUTPUT);
 
@@ -135,7 +139,8 @@ void loop()
         YOUR RUNNING CODE HERE
      ******************************************************************************/
     if (DR_Asserted()) {
-        // If DR pin is high, read Pinnacle data into absData_t struct
+        // If DR pin is high, start timer & read Pinnacle data into absData_t struct
+        touch_down = millis();
         Pinnacle_GetAbsolute(touchData);
         if (DEBUG_SERIAL) {
             Serial.print(touchData.xValue);
@@ -143,6 +148,12 @@ void loop()
             Serial.print(touchData.yValue);
             Serial.print('\t');
             Serial.println(touchData.zValue);
+        }
+        touch_recorded = true;
+    } else if (touch_recorded) {
+        lift_off = millis();
+        if (lift_off - touch_down <= TAP_THRESH) {
+            Serial.println("TAP!");
         }
     }
 }
