@@ -69,7 +69,7 @@
 
 #define TAP_TIMEOUT_MSEC 300
 
-#define DEBUG_SERIAL 1  // Print debug info to serial port
+#define DEBUG_SERIAL 0  // Print debug info to serial port
 #define TAP_THRESH 300  // Threshold for tap duration in ms
 
 // Convenient way to store and access measurements
@@ -140,7 +140,10 @@ void loop()
      ******************************************************************************/
     if (DR_Asserted()) {
         // If DR pin is high, start timer & read Pinnacle data into absData_t struct
-        touch_down = millis();
+        if (!touch_recorded) {
+            touch_down = millis();
+            touch_recorded = true;
+        }
         Pinnacle_GetAbsolute(touchData);
         if (DEBUG_SERIAL) {
             Serial.print(touchData.xValue);
@@ -149,13 +152,20 @@ void loop()
             Serial.print('\t');
             Serial.println(touchData.zValue);
         }
-        touch_recorded = true;
-    } else if (touch_recorded) {
+    } else if (touch_recorded) {    
         lift_off = millis();
-        if (lift_off - touch_down <= TAP_THRESH) {
+        unsigned long touch_duration = lift_off - touch_down;
+        if (touch_duration <= TAP_THRESH) {
+            Serial.print(touch_duration);
+            Serial.print(" ms\t");
             Serial.println("TAP!");
         }
+        touch_recorded = false;
     }
+    // Wait 10ms before checking DR buffer again. Per 1CA027 datasheet, the buffer is updated every 10 ms.
+    //   Without the delay, the elseif(touch_recorded) can be true before contact is removed. Would like a
+    //   solution that doesn't use delay in main loop.
+    delay(10);
 }
 
 /*  Pinnacle-based TM0XX0XX Functions  */
