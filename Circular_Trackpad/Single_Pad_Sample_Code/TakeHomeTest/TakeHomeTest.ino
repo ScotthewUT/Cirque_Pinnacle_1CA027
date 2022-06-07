@@ -45,7 +45,7 @@
 #define SYSCONFIG_1 0x00
 #define FEEDCONFIG_1 0x03
 #define FEEDCONFIG_2 0x1F
-#define Z_IDLE_COUNT 0x05
+#define Z_IDLE_COUNT 0x01
 
 // Coordinate scaling values
 #define PINNACLE_XMAX 2047    // max value Pinnacle can report for X
@@ -56,6 +56,8 @@
 #define PINNACLE_Y_UPPER 1471 // max "reachable" Y value
 #define PINNACLE_X_RANGE (PINNACLE_X_UPPER - PINNACLE_X_LOWER)
 #define PINNACLE_Y_RANGE (PINNACLE_Y_UPPER - PINNACLE_Y_LOWER)
+#define PINNACLE_X_CENTER ((PINNACLE_X_LOWER + PINNACLE_X_UPPER) / 2)
+#define PINNACLE_Y_CENTER ((PINNACLE_Y_LOWER + PINNACLE_Y_UPPER) / 2)
 #define ZONESCALE 256 // divisor for reducing x,y values to an array index for the LUT
 #define ROWS_Y ((PINNACLE_YMAX + 1) / ZONESCALE)
 #define COLS_X ((PINNACLE_XMAX + 1) / ZONESCALE)
@@ -69,8 +71,8 @@
 
 #define TAP_TIMEOUT_MSEC 300
 
-#define DEBUG_SERIAL 0  // Print debug info to serial port
-#define TAP_THRESH 300  // Threshold for tap duration in ms
+#define DEBUG_SERIAL 1      // Print debug info to serial port
+#define TAP_THRESH 300      // Threshold for tap duration in ms
 
 // Convenient way to store and access measurements
 typedef struct _absData
@@ -84,6 +86,7 @@ typedef struct _absData
 } absData_t;
 
 absData_t touchData;
+uint8_t initial_quadrant;
 unsigned long touch_down, lift_off;
 bool touch_recorded;
 
@@ -139,33 +142,77 @@ void loop()
         YOUR RUNNING CODE HERE
      ******************************************************************************/
     if (DR_Asserted()) {
-        // If DR pin is high, start timer & read Pinnacle data into absData_t struct
+        // When DR pin goes high, read Pinnacle data into absData_t struct, start timer, & save initial quadrant
+        unsigned long timer = millis();
+        Pinnacle_GetAbsolute(touchData);
+        // Offset x & y positions with centerpoint
+        int16_t x_pos = touchData.xValue - PINNACLE_X_CENTER;
+        int16_t y_pos = touchData.yValue - PINNACLE_Y_CENTER;
         if (!touch_recorded) {
-            touch_down = millis();
+            // Save initial data when touch is first detected
+            initial_quadrant = getQuadrant(x_pos, y_pos);
+            touch_down = timer;
             touch_recorded = true;
         }
-        Pinnacle_GetAbsolute(touchData);
+
+        // Print touchData to console if debug macro is enabled
         if (DEBUG_SERIAL) {
-            Serial.print(touchData.xValue);
+            Serial.print(x_pos);
             Serial.print('\t');
-            Serial.print(touchData.yValue);
+            Serial.print(y_pos);
             Serial.print('\t');
-            Serial.println(touchData.zValue);
+            Serial.print(touchData.zValue);
+            Serial.print("\tQ");
+            Serial.println(getQuadrant(x_pos, y_pos));
         }
-    } else if (touch_recorded) {    
-        lift_off = millis();
-        unsigned long touch_duration = lift_off - touch_down;
-        if (touch_duration <= TAP_THRESH) {
-            Serial.print(touch_duration);
-            Serial.print(" ms\t");
-            Serial.println("TAP!");
+
+        // As long as Z-idle count is configured to >0, the first empty packet can be used as lift-off detection
+        if (touchData.zValue == 0) {
+            lift_off = millis();
+            unsigned long touch_duration = (lift_off - touch_down) - 10;
+            if (touch_duration <= TAP_THRESH) {
+                Serial.print(touch_duration);
+                Serial.print(" ms\t");
+                Serial.println("TAP!");
+            }
+            touch_recorded = false;
         }
-        touch_recorded = false;
+
+        // Pevious loop recorded touch data; now lift-off detected
     }
+    //    else if (touch_recorded) {
+    //        lift_off = millis();
+    //        unsigned long touch_duration = lift_off - touch_down;
+    //        if (touch_duration <= TAP_THRESH) {
+    //            Serial.print(touch_duration);
+    //            Serial.print(" ms\t");
+    //            Serial.println("TAP!");
+    //        }
+    //        touch_recorded = false; 
+    //    }
     // Wait 10ms before checking DR buffer again. Per 1CA027 datasheet, the buffer is updated every 10 ms.
-    //   Without the delay, the elseif(touch_recorded) can be true before contact is removed. Would like a
-    //   solution that doesn't use delay in main loop.
     delay(10);
+}
+
+/** Determines the quadrant of a given x,y coordinate. Uses conventional Cartesian numbering.
+ *
+ *  @param  x The x-value of the coordinate
+ *  @param  y the y-value of the coordinate
+ *  @return The quadrant number of the coordinate (0-3)
+ */
+uint8_t getQuadrant(int16_t x, int16_t y) {
+    if (x > 0 && y > 0) {        //             ^ y
+        return 0;                //             |
+    }                            //      Q1     |     Q0
+    else if (x < 1 && y > 0) {   //             |
+        return 1;                //             |
+    }                            // ------------------------>
+    else if (x < 1) {            //             |           x
+        return 2;                //             |
+    }                            //      Q2     |     Q3
+    else {                       //             |
+        return 3;                //             |
+    }
 }
 
 /*  Pinnacle-based TM0XX0XX Functions  */
@@ -185,7 +232,7 @@ void Pinnacle_Init()
     // Host enables preferred output mode (absolute)
     RAP_Write(0x04, FEEDCONFIG_1);
 
-    // Host sets z-idle packet count to 5 (default is 30)
+    // Host sets z-idle packet count (default is 30)
     RAP_Write(0x0A, Z_IDLE_COUNT);
     Serial.println("Pinnacle Initialized...");
 }
