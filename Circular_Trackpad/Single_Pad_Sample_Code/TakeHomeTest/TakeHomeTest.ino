@@ -69,6 +69,8 @@
 
 #define TAP_TIMEOUT_MSEC 300
 
+#define DEBUG_SERIAL 1  // Print debug info to serial port
+
 // Convenient way to store and access measurements
 typedef struct _absData
 {
@@ -132,7 +134,17 @@ void loop()
     /*******************************************************************************
         YOUR RUNNING CODE HERE
      ******************************************************************************/
-
+    if (DR_Asserted()) {
+        // If DR pin is high, read Pinnacle data into absData_t struct
+        Pinnacle_GetAbsolute(touchData);
+        if (DEBUG_SERIAL) {
+            Serial.print(touchData.xValue);
+            Serial.print('\t');
+            Serial.print(touchData.yValue);
+            Serial.print('\t');
+            Serial.println(touchData.zValue);
+        }
+    }
 }
 
 /*  Pinnacle-based TM0XX0XX Functions  */
